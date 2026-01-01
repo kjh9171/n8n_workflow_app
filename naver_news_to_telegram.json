@@ -1,0 +1,98 @@
+{
+  "name": "네이버 속보(OpenAPI) → 텔레그램",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.naver.com/v1/search/news.json",
+        "responseFormat": "json",
+        "queryParameters": {
+          "parameters": [
+            { "name": "query", "value": "속보" },
+            { "name": "sort", "value": "date" },
+            { "name": "display", "value": "5" }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Naver-Client-Id",
+              "value": "={{$env.NAVER_CLIENT_ID}}"
+            },
+            {
+              "name": "X-Naver-Client-Secret",
+              "value": "={{$env.NAVER_CLIENT_SECRET}}"
+            }
+          ]
+        }
+      },
+      "name": "Fetch News (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items[0].json.items.map(i => ({\n  json: {\n    title: i.title.replace(/<[^>]*>/g, ''),\n    link: i.link,\n    description: i.description.replace(/<[^>]*>/g, ''),\n    pubDate: i.pubDate\n  }\n}));"
+      },
+      "name": "Normalize News",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = this.getWorkflowStaticData('global');\nif (!data.sent) data.sent = [];\n\nconst out = [];\nfor (const item of items) {\n  if (!data.sent.includes(item.json.link)) {\n    data.sent.push(item.json.link);\n    out.push(item);\n  }\n}\nreturn out;"
+      },
+      "name": "Filter Duplicates",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "item.json.text = `📰 ${item.json.title}\n\n${item.json.description}\n\n🔗 ${item.json.link}`;\nreturn item;"
+      },
+      "name": "Format Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{`https://api.telegram.org/bot${$env.TELEGRAM_BOT_TOKEN}/sendMessage`}}",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\", \"text\": \"{{$json.text}}\"}"
+      },
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "Cron": { "main": [[{ "node": "Fetch News (API)", "type": "main", "index": 0 }]] },
+    "Fetch News (API)": { "main": [[{ "node": "Normalize News", "type": "main", "index": 0 }]] },
+    "Normalize News": { "main": [[{ "node": "Filter Duplicates", "type": "main", "index": 0 }]] },
+    "Filter Duplicates": { "main": [[{ "node": "Format Message", "type": "main", "index": 0 }]] },
+    "Format Message": { "main": [[{ "node": "Send Telegram", "type": "main", "index": 0 }]] }
+  }
+}

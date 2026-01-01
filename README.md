@@ -1,108 +1,174 @@
+# n8n Workflow App
 
+이 저장소는 **n8n을 Docker 기반으로 실행**하고, 이를 활용해
+외부 API 연동 자동화(예: 네이버 뉴스 → 텔레그램 알림)를 구현하기 위한
+**실습 및 운영용 베이스 프로젝트**입니다.
 
-# 📦 n8n Workflow App
-
-n8n_workflow_app은 **n8n 기반의 노코드(코드 없는) 워크플로우 자동화 플랫폼**을 위한 환경 구성 및 예제입니다.
-
-이 프로젝트는 n8n을 빠르게 실행하고, 워크플로우를 작성/확장/배포하는 데 필요한 설정 및 Docker 기반 구동 구성을 포함합니다.
-
----
-
-## 📌 주요 기능
-
-* **n8n 자동화 플랫폼 구성**
-  n8n을 Docker Compose로 실행할 수 있는 기본 설정 제공
-
-* **워크플로우 데이터 저장**
-  n8n에서 생성한 워크플로우를 PostgreSQL 등에 저장할 수 있는 환경
-
-* **개발용/테스트용 환경 제공**
-  로컬에서 자동화 테스트 및 워크플로우 수정/확인 가능
+RSS 기반 자동화는 외부 정책 변화로 인해 불안정할 수 있으므로,
+본 프로젝트에서는 **네이버 Open API (뉴스 검색 API)** 기반의
+안정적인 자동화를 기본 전략으로 사용합니다.
 
 ---
 
-## 🚀 시작하기
+## 전체 구성 개요
 
-아래 명령으로 필요한 구성 요소를 바로 실행하세요.
+* n8n : 워크플로우 자동화 플랫폼
+* PostgreSQL : n8n 워크플로우 및 설정 저장소
+* Docker / Docker Compose : 실행 환경
+* Telegram Bot API : 알림 전송
+* Naver Open API (News Search) : 뉴스 수집
 
-### 1. 저장소 클론
-
-```bash
-git clone https://github.com/kjh9171/n8n_workflow_app.git
-cd n8n_workflow_app
+```
+[ Naver Open API ]
+        ↓
+      n8n (Cron / HTTP Request / Function)
+        ↓
+[ Telegram Bot ]
 ```
 
-### 2. 환경 설정
+---
 
-`.env` 파일을 프로젝트 루트에 생성하고 다음과 같이 설정합니다:
+## 디렉토리 구조
 
-```bash
-# 기본 n8n 환경값
-N8N_HOST=localhost
-N8N_PORT=5678
-N8N_PROTOCOL=http
+```
+n8n_workflow_app/
+├─ docker-compose.yml
+├─ .env               # 실행 환경 변수 (git ignore 권장)
+├─ .env.example       # 환경 변수 예시
+└─ README.md
+```
 
-# DB 설정
-POSTGRES_USER=your_user
-POSTGRES_PASSWORD=your_password
+---
+
+## 실행 환경
+
+* Docker
+* Docker Compose
+* Node.js (직접 실행 시에만 필요)
+
+권장 환경:
+
+* Docker Desktop (Windows / macOS)
+* Linux Docker Engine
+
+---
+
+## 1. 환경 변수 설정
+
+`.env` 파일을 생성하고 아래 값을 설정합니다.
+
+```env
+# PostgreSQL
 POSTGRES_DB=n8n
+POSTGRES_USER=n8n
+POSTGRES_PASSWORD=n8n1!
 
-# 기타 필요 인증 키 등
+# n8n 로그인 계정
+N8N_USER=admin
+N8N_PASSWORD=n8n1!
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID=YOUR_CHAT_ID
+
+# Naver Open API
+NAVER_CLIENT_ID=YOUR_NAVER_CLIENT_ID
+NAVER_CLIENT_SECRET=YOUR_NAVER_CLIENT_SECRET
 ```
 
-> `.env`는 민감 정보가 포함될 수 있으므로 절대 공개 저장소에 올리지 마세요.
+※ `.env` 파일은 **외부 공개 금지**를 권장합니다.
 
 ---
 
-## 📦 Docker Compose 실행
+## 2. Docker 컨테이너 실행
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-이 명령으로 구성된 서비스들이 실행됩니다:
+실행 후 컨테이너 확인:
 
-* n8n Node 기반 워크플로우 자동화 서버
-* PostgreSQL 데이터베이스
-* (필요 시) 추가 서비스들
+```bash
+docker ps
+```
 
-실행 후 브라우저에서 **[http://localhost:5678**로](http://localhost:5678**로) 접속하면 n8n UI가 나타납니다.
+기본적으로 n8n은 아래 주소에서 접근 가능합니다.
 
----
-
-## 🧠 n8n 소개 (배경)
-
-n8n은 시각적 워크플로우 빌더 기반의 **노코드 + 코드 자동화 도구**입니다. 400개 이상의 서비스 통합을 제공하며, 복잡한 자동화 과정을 드래그·드롭으로 구성할 수 있습니다. ([GitHub][2])
-
-n8n의 장점은 다음과 같아요:
-
-* 시각적 편집을 통한 자동화 흐름 구성
-* 필요하면 JavaScript/Python 코드 삽입 가능
-* 자체 호스팅 가능(완전 제어)
-* 다양한 트리거(웹훅, 일정, 이벤트 등) 지원
+```
+http://localhost:5678
+```
 
 ---
 
-## 📌 활용 예시
+## 3. n8n 로그인
 
-* GitHub 이벤트를 받아 자동 이슈 생성
-* 이메일 알림 및 보고서 자동 발송
-* 데이터베이스 간 데이터 동기화
-* AI 기반 자동 요약/분석 워크플로우 실행
+* ID : `N8N_USER`
+* Password : `N8N_PASSWORD`
 
-(실제 예시들은 워크플로우 JSON 파일로 저장하여 n8n UI에 **Import → 실행** 형태로 적용할 수 있음)
+`.env`에 설정한 값을 사용합니다.
 
 ---
 
-## 📘 리소스
+## 4. 워크플로우 구성 개요
 
-n8n 공식 문서 및 참고 링크
+### 네이버 속보 → 텔레그램 알림
 
-* n8n 공식 홈페이지: [https://n8n.io](https://n8n.io)
-* n8n GitHub: [https://github.com/n8n-io/n8n](https://github.com/n8n-io/n8n)
-* GitHub 통합 자동화 예시(워크플로우 템플릿) 참고 자료
+워크플로우 흐름:
+
+1. **Cron** : 5분마다 실행
+2. **HTTP Request** : 네이버 Open API 뉴스 검색
+3. **Function** : 데이터 정규화 (HTML 태그 제거)
+4. **Function** : 중복 기사 제거
+5. **Function** : 텔레그램 메시지 포맷
+6. **HTTP Request** : Telegram Bot API 전송
+
+이 방식은 RSS 차단, User-Agent 문제, 404 오류를 회피할 수 있어
+**운영 환경에 적합**합니다.
 
 ---
 
-[1]: https://github.com/kjh9171/n8n_workflow_app "GitHub - kjh9171/n8n_workflow_app: n8n, 노코드 자동화 플랫폼"
-[2]: https://github.com/n8n-io?utm_source=chatgpt.com "n8n - Workflow Automation - GitHub"
+## 5. 워크플로우 Import 방법
+
+1. n8n UI 접속
+2. `Workflows` → `Import`
+3. JSON 파일 업로드 또는 클립보드 붙여넣기
+4. 환경 변수 확인 후 `Active` 활성화
+
+---
+
+## 6. 문제 해결 가이드
+
+### 네이버 RSS 404 오류
+
+* 서버/컨테이너 환경에서 RSS 접근이 차단됨
+* 정상적인 동작이 아님
+* **네이버 Open API 사용 권장**
+
+### Telegram 메시지가 오지 않을 때
+
+* `TELEGRAM_CHAT_ID` 확인 (그룹은 `-` 포함)
+* Bot이 채팅방에 추가되어 있는지 확인
+* Workflow 활성화 여부 확인
+
+---
+
+## 7. 확장 아이디어
+
+* 키워드 다중 검색 (보안, 장애, 침해사고)
+* 시간대별 요약 알림
+* Slack / Email / Webhook 연동
+* 로그 수집 및 보안 이벤트 자동화
+
+---
+
+## 정리
+
+이 프로젝트는 단순한 뉴스 봇이 아니라,
+**API 기반 정보 수집 자동화 파이프라인의 출발점**입니다.
+
+RSS에 의존하지 않고,
+정책 변화에도 안정적으로 동작하는 구조를 목표로 합니다.
+
+---
+
+
